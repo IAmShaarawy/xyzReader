@@ -27,19 +27,24 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewAnimationUtils;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.example.xyzreader.R;
 import com.example.xyzreader.Utils.FontUtil;
 import com.example.xyzreader.Utils.PreferenceUtil;
+import com.example.xyzreader.data.ArticleEntity;
 import com.example.xyzreader.data.ArticleLoader;
 import com.example.xyzreader.data.ItemsContract;
 import com.example.xyzreader.data.UpdaterService;
+import com.squareup.picasso.Picasso;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.List;
 
 /**
  * An activity representing a list of Articles. This activity has different presentations for
@@ -48,11 +53,12 @@ import java.util.GregorianCalendar;
  * activity presents a grid of items as cards.
  */
 public class ArticleListActivity extends AppCompatActivity implements
-        LoaderManager.LoaderCallbacks<Cursor> {
+        android.support.v4.app.LoaderManager.LoaderCallbacks<Cursor> {
 
     private static final String TAG = ArticleListActivity.class.toString();
     private SwipeRefreshLayout mSwipeRefreshLayout;
     private RecyclerView mRecyclerView;
+    private RecyclerView.Adapter mAdapter;
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss");
     // Use default locale format
     private SimpleDateFormat outputFormat = new SimpleDateFormat();
@@ -62,6 +68,7 @@ public class ArticleListActivity extends AppCompatActivity implements
     private PreferenceUtil mPreferenceUtil;
 
     private LocalBroadcastManager mLocalBroadcastManager;
+    private List<ArticleEntity> mArticleEntities;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,7 +82,19 @@ public class ArticleListActivity extends AppCompatActivity implements
         mSwipeRefreshLayout = (SwipeRefreshLayout) findViewById(R.id.swipe_refresh_layout);
 
         mRecyclerView = (RecyclerView) findViewById(R.id.recycler_view);
-        getLoaderManager().initLoader(0, null, this);
+
+        StaggeredGridLayoutManager sglm =
+                new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
+        mRecyclerView.setLayoutManager(sglm);
+
+        mArticleEntities = new ArrayList<>();
+
+        mAdapter = new Adapter(mArticleEntities);
+
+        mRecyclerView.setAdapter(mAdapter);
+
+
+        getSupportLoaderManager().initLoader(0, null, this);
 
         if (!mPreferenceUtil.getBoolean(PreferenceUtil.DefaultKeys.PREF_IS_FIRST_TIME)) {
             refresh();
@@ -125,31 +144,47 @@ public class ArticleListActivity extends AppCompatActivity implements
 
     private void updateRefreshingUI() {
         mSwipeRefreshLayout.setRefreshing(mIsRefreshing);
-        getLoaderManager().restartLoader(0,null,this);
+        getSupportLoaderManager().restartLoader(0,null,this);
     }
 
     @Override
-    public Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
+    public android.support.v4.content.Loader<Cursor> onCreateLoader(int i, Bundle bundle) {
         return ArticleLoader.newAllArticlesInstance(this);
     }
 
+
+
     @Override
-    public void onLoadFinished(Loader<Cursor> cursorLoader, Cursor cursor) {
-        Adapter adapter = new Adapter(cursor);
-        adapter.setHasStableIds(true);
-        mRecyclerView.setAdapter(adapter);
-        int columnCount = getResources().getInteger(R.integer.list_column_count);
-        StaggeredGridLayoutManager sglm =
-                new StaggeredGridLayoutManager(columnCount, StaggeredGridLayoutManager.VERTICAL);
-        mRecyclerView.setLayoutManager(sglm);
+    public void onLoadFinished(android.support.v4.content.Loader<Cursor> loader, Cursor cursor) {
+
+
+        int cursorRowCount = cursor.getCount();
+
+        ArticleEntity articleEntity;
+        mArticleEntities.clear();
+        cursor.moveToFirst();
+        for (int i = 0; i < cursorRowCount; i++) {
+            articleEntity = new ArticleEntity(
+                    cursor.getString(ArticleLoader.Query._ID),
+                    cursor.getString(ArticleLoader.Query.TITLE),
+                    cursor.getString(ArticleLoader.Query.PUBLISHED_DATE),
+                    cursor.getString(ArticleLoader.Query.AUTHOR),
+                    cursor.getString(ArticleLoader.Query.THUMB_URL),
+                    cursor.getString(ArticleLoader.Query.PHOTO_URL),
+                    cursor.getString(ArticleLoader.Query.ASPECT_RATIO),
+                    cursor.getString(ArticleLoader.Query.BODY));
+            mArticleEntities.add(articleEntity);
+            cursor.moveToNext();
+        }
+        mAdapter.notifyDataSetChanged();
     }
 
     @Override
-    public void onLoaderReset(Loader<Cursor> loader) {
+    public void onLoaderReset(android.support.v4.content.Loader<Cursor> loader) {
         mRecyclerView.setAdapter(null);
     }
 
-    public static void sendMeBroadCast(Context context,boolean isSuccess){
+    public static void sendMeBroadCast(Context context, boolean isSuccess){
         LocalBroadcastManager broadcastManager = LocalBroadcastManager.getInstance(context);
         Intent intent = new Intent(UpdaterService.BROADCAST_ACTION_STATE_CHANGE);
         intent.putExtra(Intent.EXTRA_RESULT_RECEIVER,isSuccess);
@@ -157,37 +192,36 @@ public class ArticleListActivity extends AppCompatActivity implements
     }
 
     private class Adapter extends RecyclerView.Adapter<ViewHolder> {
-        private Cursor mCursor;
+        private List<ArticleEntity> mArticleEntities;
 
-        public Adapter(Cursor cursor) {
-            mCursor = cursor;
+        public Adapter(List<ArticleEntity> articleEntities) {
+            mArticleEntities = articleEntities;
         }
 
         @Override
         public long getItemId(int position) {
-            mCursor.moveToPosition(position);
-            return mCursor.getLong(ArticleLoader.Query._ID);
+           return Long.getLong(mArticleEntities.get(position).get_id());
         }
 
         @Override
         public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
             View view = getLayoutInflater().inflate(R.layout.list_item_article, parent, false);
             final ViewHolder vh = new ViewHolder(view);
-            view.setOnClickListener(new View.OnClickListener() {
-                @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
-                @Override
-                public void onClick(View view) {
 
-                    startActivity(new Intent(Intent.ACTION_VIEW,
-                            ItemsContract.Items.buildItemUri(getItemId(vh.getAdapterPosition()))));
+            view.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Intent intent = new Intent(ArticleListActivity.this,ArticleDetailActivity.class);
+                    intent.putExtra("_ID",vh.getAdapterPosition());
+                    intent.putExtra("DATA",(ArrayList)mArticleEntities);
+                    startActivity(intent);
                 }
             });
             return vh;
         }
 
-        private Date parsePublishedDate() {
+        private Date parsePublishedDate(String date) {
             try {
-                String date = mCursor.getString(ArticleLoader.Query.PUBLISHED_DATE);
                 return dateFormat.parse(date);
             } catch (ParseException ex) {
                 Log.e(TAG, ex.getMessage());
@@ -198,9 +232,9 @@ public class ArticleListActivity extends AppCompatActivity implements
 
         @Override
         public void onBindViewHolder(ViewHolder holder, int position) {
-            mCursor.moveToPosition(position);
-            holder.titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
-            Date publishedDate = parsePublishedDate();
+            ArticleEntity entity = mArticleEntities.get(position);
+            holder.titleView.setText(entity.getTitle());
+            Date publishedDate = parsePublishedDate(entity.getPublished_date());
             if (!publishedDate.before(START_OF_EPOCH.getTime())) {
 
                 holder.subtitleView.setText(Html.fromHtml(
@@ -209,34 +243,34 @@ public class ArticleListActivity extends AppCompatActivity implements
                                 System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
                                 DateUtils.FORMAT_ABBREV_ALL).toString()
                                 + "<br/>" + " by "
-                                + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+                                + entity.getAuthor()));
             } else {
                 holder.subtitleView.setText(Html.fromHtml(
                         outputFormat.format(publishedDate)
                         + "<br/>" + " by "
-                        + mCursor.getString(ArticleLoader.Query.AUTHOR)));
+                        + entity.getAuthor()));
             }
-            holder.thumbnailView.setImageUrl(
-                    mCursor.getString(ArticleLoader.Query.THUMB_URL),
-                    ImageLoaderHelper.getInstance(ArticleListActivity.this).getImageLoader());
-            holder.thumbnailView.setAspectRatio(mCursor.getFloat(ArticleLoader.Query.ASPECT_RATIO));
+            Picasso.with(ArticleListActivity.this)
+                    .load(entity.getPhoto_url())
+                    .into(holder.thumbnailView);
         }
 
         @Override
         public int getItemCount() {
-            return mCursor.getCount();
+            return mArticleEntities.size();
         }
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
-        public DynamicHeightNetworkImageView thumbnailView;
+
+        public ImageView thumbnailView;
         public TextView titleView;
         public TextView subtitleView;
 
         public ViewHolder(View view) {
             super(view);
             FontUtil.applyFonts(view);
-            thumbnailView = (DynamicHeightNetworkImageView) view.findViewById(R.id.thumbnail);
+            thumbnailView = (ImageView) view.findViewById(R.id.thumbnail);
             titleView = (TextView) view.findViewById(R.id.article_title);
             subtitleView = (TextView) view.findViewById(R.id.article_subtitle);
         }

@@ -7,7 +7,7 @@ import android.net.Uri;
 /**
  * Helper for loading a list of articles or a single article.
  */
-public class ArticleLoader extends CursorLoader {
+public class ArticleLoader extends android.support.v4.content.CursorLoader {
     public static ArticleLoader newAllArticlesInstance(Context context) {
         return new ArticleLoader(context, ItemsContract.Items.buildDirUri());
     }
