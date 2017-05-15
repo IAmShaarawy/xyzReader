@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.graphics.drawable.ColorDrawable;
 import android.os.Bundle;
+import android.os.PersistableBundle;
 import android.support.v4.app.ShareCompat;
 import android.support.v4.view.ViewPager;
 import android.support.v7.app.AppCompatActivity;
@@ -42,6 +43,9 @@ public class ArticleDetailActivity extends AppCompatActivity {
                 mStartId  = getIntent().getIntExtra("_ID",0);
                 mArticleEntities = getIntent().getParcelableArrayListExtra("DATA");
             }
+        }else {
+            mArticleEntities= savedInstanceState.getParcelableArrayList("DATA");
+            mStartId = savedInstanceState.getInt("_ID");
         }
 
         Toolbar toolbar = (Toolbar) findViewById(R.id.article_detail_toolbar);
@@ -88,6 +92,13 @@ public class ArticleDetailActivity extends AppCompatActivity {
             }
         });
 
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelableArrayList("DATA",(ArrayList)mArticleEntities);
+        outState.putInt("_ID",mPager.getCurrentItem());
     }
 
     private class MyPagerAdapter extends android.support.v4.app.FragmentStatePagerAdapter {
