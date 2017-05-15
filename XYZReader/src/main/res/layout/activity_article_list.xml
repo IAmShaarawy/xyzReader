@@ -7,7 +7,8 @@
     <android.support.design.widget.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="@color/theme_primary"
+        android:background="@color/colorPrimary"
+        android:elevation="4dp"
         >
 
         <android.support.design.widget.CollapsingToolbarLayout
@@ -16,7 +17,7 @@
             android:layout_height="64dp"
             app:expandedTitleMarginEnd="64dp"
             app:expandedTitleMarginStart="48dp"
-            app:contentScrim="@color/theme_primary"
+            app:contentScrim="@color/colorPrimary"
 
             app:layout_scrollFlags="scroll|exitUntilCollapsed">
 
